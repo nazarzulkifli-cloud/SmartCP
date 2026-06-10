@@ -1,0 +1,1121 @@
+const ROOT_FOLDER_ID = "1z_yQ09-VdccgE9qQbbAqQVHwdgccH0V-";
+
+function doGet(e) {
+  
+  if (!e || !e.parameter) return ContentService.createTextOutput("Akses Ditolak.");
+  
+  var action = e.parameter.action;
+  Logger.log("ACTION = "+action);
+
+  if (action === 'update') {
+    return simpanDataDariESP(e.parameter);
+  }
+  
+if(action === "createTicket"){
+
+  var data = {
+    noMesin : e.parameter.noMesin || "",
+    pelapor : e.parameter.pelapor || "",
+    noWa    : e.parameter.noWa || "",
+    keluhan : e.parameter.keluhan || "",
+    foto1   : e.parameter.foto1 || "",
+    foto2   : e.parameter.foto2 || ""  
+    
+  };
+  Logger.log(JSON.stringify(data));
+  var hasil = buatPanggilanTeknisi(data);
+
+  return ContentService
+    .createTextOutput(JSON.stringify(hasil))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+if(action === "getMesin"){
+
+  var hasil = getDataMesin(
+    e.parameter.noMesin || ""
+  );
+
+  return ContentService
+    .createTextOutput(JSON.stringify(hasil))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+if(action === "updateContact"){
+
+  var hasil = updateContactMesin(
+    e.parameter.noMesin || "",
+    e.parameter.contact || "",
+    e.parameter.wa || ""
+  );
+
+  return ContentService
+    .createTextOutput(JSON.stringify(hasil))
+    .setMimeType(ContentService.MimeType.JSON);
+
+}
+if(action === "uploadPhoto"){
+
+  var hasil = uploadPhotoToCustomerFolder(
+    e.parameter.pelanggan || "",
+    e.parameter.fileName || "",
+    e.parameter.base64 || "",
+    e.parameter.mimeType || "image/jpeg"
+  );
+
+  return ContentService
+    .createTextOutput(JSON.stringify(hasil))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+  // Membaca halaman tujuan ('dashboard', 'maintenance', atau 'service')
+  var page = e.parameter.page || 'dashboard';
+  var idMesin = e.parameter.noMesin || e.parameter.mesin || '';
+  
+  // Validasi jika salah ketik parameter nama halaman 'mainten' diarahkan ke 'maintenance'
+  if (page === 'maint') page = 'maintenance';
+  
+  var tmp = HtmlService.createTemplateFromFile(page);
+  const identitas = getIdentitasMesin(idMesin);
+  
+  var noHpKantorDefault = "62818903113";
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetDummy = ss.getSheetByName("dummy");
+    if (sheetDummy) {
+      var dataDummy = sheetDummy.getDataRange().getValues();
+      if (dataDummy.length > 1 && dataDummy[1][3]) {
+        noHpKantorDefault = String(dataDummy[1][3]).replace(/[^0-9]/g, '');
+        if (noHpKantorDefault.startsWith('0')) {
+          noHpKantorDefault = '62' + noHpKantorDefault.slice(1);
+        }
+      }
+    }
+  } catch(err) {
+    Logger.log("Gagal mengambil No HP: " + err.toString());
+  }
+  
+  // Oper data ke sisi HTML View
+  tmp.idMesinServer = idMesin; 
+  tmp.pelangganServer = identitas.pelanggan || "Monitor";
+  tmp.tipeServer = identitas.tipe || "-";
+  tmp.noHpKantorServer = noHpKantorDefault; 
+  
+  return tmp.evaluate()
+    .setTitle("Sistem - " + idMesin)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+    
+}
+function doPost(e){
+
+  try{
+
+    const data =
+      JSON.parse(e.postData.contents);
+
+    if(data.action === "uploadPhoto"){
+
+      const hasil =
+        uploadPhotoToCustomerFolder(
+          data.pelanggan,
+          data.fileName,
+          data.base64,
+          data.mimeType
+        );
+
+      return ContentService
+        .createTextOutput(JSON.stringify(hasil))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          success:false,
+          message:"Action tidak dikenal"
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+
+  }catch(err){
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          success:false,
+          message:err.toString()
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getDataMesin(noMesin) {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("reff");
+
+  const data = sh.getDataRange().getValues();
+
+  for(let i=1;i<data.length;i++){
+
+    if(String(data[i][0]).trim() === String(noMesin).trim()){
+
+      return {
+        success:true,
+        noMesin : data[i][0],
+        pelanggan : data[i][1] || "",
+        wa : data[i][5] || "",      // kolom F
+        contact : data[i][6] || ""  // kolom G
+      };
+    }
+  }
+
+  return {
+    success:false,
+    message:"Mesin tidak ditemukan"
+  };
+}
+function updateContactMesin(noMesin, contact, wa){
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("reff");
+
+  const data = sh.getDataRange().getValues();
+
+  for(let i=1;i<data.length;i++){
+
+    if(String(data[i][0]).trim() === String(noMesin).trim()){
+
+      sh.getRange(i+1,7).setValue(contact); // G contact
+      sh.getRange(i+1,6).setValue(wa);      // F NO WA
+
+      return {
+        success:true
+      };
+    }
+  }
+
+  return {
+    success:false,
+    message:"Mesin tidak ditemukan"
+  };
+}
+ function getOrCreateCustomerFolder(namaPelanggan){
+
+  const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
+
+  const folders = root.getFoldersByName(namaPelanggan);
+
+  let customerFolder;
+
+  if(folders.hasNext()){
+    customerFolder = folders.next();
+  }else{
+    customerFolder = root.createFolder(namaPelanggan);
+
+    customerFolder.createFolder("photo");
+    customerFolder.createFolder("report");
+    customerFolder.createFolder("document");
+  }
+
+  return customerFolder;
+} 
+function getPhotoFolder(namaPelanggan){
+
+  const customerFolder =
+    getOrCreateCustomerFolder(namaPelanggan);
+
+  const photos =
+    customerFolder.getFoldersByName("photo");
+
+  if(photos.hasNext()){
+    return photos.next();
+  }
+
+  return customerFolder.createFolder("photo");
+}
+
+  function testFolder(){
+
+  const folder = getPhotoFolder("mahatma gandhi school");
+
+  Logger.log(folder.getName());
+  Logger.log(folder.getId());
+
+}
+function uploadPhotoToCustomerFolder(
+  pelanggan,
+  fileName,
+  base64Data,
+  mimeType
+){
+
+  try {
+
+    if(!pelanggan){
+      return {
+        success:false,
+        message:"Nama pelanggan kosong"
+      };
+    }
+
+    if(!base64Data){
+      return {
+        success:false,
+        message:"Data foto kosong"
+      };
+    }
+
+    const photoFolder =
+      getPhotoFolder(pelanggan);
+
+    // Bersihkan prefix data:image/jpeg;base64,...
+    if(base64Data.indexOf(",") > -1){
+      base64Data =
+        base64Data.split(",")[1];
+    }
+
+    const bytes =
+      Utilities.base64Decode(base64Data);
+
+    const ext =
+      mimeType.includes("png")
+      ? "png"
+      : "jpg";
+
+    const namaUnik =
+      Utilities.formatDate(
+        new Date(),
+        "Asia/Jakarta",
+        "yyyyMMdd_HHmmss"
+      ) +
+      "_" +
+      fileName.replace(/[^\w\-]/g,"_") +
+      "." +
+      ext;
+
+    const blob =
+      Utilities.newBlob(
+        bytes,
+        mimeType,
+        namaUnik
+      );
+
+    const file =
+      photoFolder.createFile(blob);
+
+    file.setSharing(
+      DriveApp.Access.ANYONE_WITH_LINK,
+      DriveApp.Permission.VIEW
+    );
+
+    return {
+      success:true,
+      fileId:file.getId(),
+      fileName:file.getName(),
+      size:file.getSize(),
+      url:
+        "https://drive.google.com/file/d/" +
+        file.getId() +
+        "/view"
+    };
+
+  } catch(err){
+
+    Logger.log(err);
+
+    return {
+      success:false,
+      message:err.toString()
+    };
+  }
+}
+
+function tesFonnte() {
+
+  const response = UrlFetchApp.fetch(
+    "https://api.fonnte.com/send",
+    {
+      method: "post",
+      headers: {
+        "Authorization": "9TbK7ULbPvzDVdHcs1Ai"
+      },
+      payload: {
+        target: "62818903113",
+        message: "🚀 Tes WA dari SMARTCp"
+      },
+      muteHttpExceptions: true
+    }
+  );
+
+  Logger.log(response.getContentText());
+
+}
+// ISI DENGAN ID FOLDER INDUK "Pelanggan" ANDA YANG ADA DI GOOGLE DRIVE
+const pelanggan = "1z_yQ09-VdccgE9qQbbAqQVHwdgccH0V-"; 
+
+// 1. FUNGSI UTAMA (Mesin Pemroses Otomatis)
+function processTableQR(sheetName, kolomNamaPelanggan, kolomIDTransaksi, prefixNamaFile, kolomTargetDownload, kolomTargetView) {
+  let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return;
+
+  let parentFolder = DriveApp.getFolderById(pelanggan);
+  let data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    let row = data[i];
+    let namaPelanggan = row[kolomNamaPelanggan - 1];
+    let idTransaksi = row[kolomIDTransaksi - 1];
+    
+    // Skrip akan berjalan jika salah satu atau kedua kolom target masih kosong
+    let linkDownloadSaatIni = row[kolomTargetDownload - 1];
+    let linkViewSaatIni = row[kolomTargetView - 1];
+
+    if (namaPelanggan && idTransaksi && (!linkDownloadSaatIni || !linkViewSaatIni)) {
+      try {
+        Utilities.sleep(3000); // Jeda 3 detik agar AppSheet selesai upload
+        
+        let subFolders = parentFolder.getFoldersByName(namaPelanggan);
+        if (subFolders.hasNext()) {
+          let pelangganFolder = subFolders.next();
+          
+          let idBersih = String(idTransaksi).trim();
+          let namaFileYangDicari = prefixNamaFile + idBersih + ".pdf";
+          let files = pelangganFolder.getFilesByName(namaFileYangDicari);
+
+          if (files.hasNext()) {
+            let file = files.next();
+            let fileId = file.getId();
+            
+            // Atur izin file agar bisa dilihat oleh siapa saja yang punya link
+            try {
+              file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            } catch(err) {}
+            
+            // KELUARAN 1: Link khusus Download Langsung (Direct Download)
+            let linkDownload = "https://drive.google.com/uc?export=download&id=" + fileId;
+            
+            // KELUARAN 2: Link khusus View Web (Sangat ramah untuk Scan QR HP)
+            let linkView = "https://drive.google.com/file/d/" + fileId + "/view?usp=drivesdk";
+            
+            // Tulis masing-masing ke kolom targetnya
+            sheet.getRange(i + 1, kolomTargetDownload).setValue(linkDownload);
+            sheet.getRange(i + 1, kolomTargetView).setValue(linkView);
+          }
+        }
+      } catch (e) {
+        Logger.log("Error pada baris " + (i+1) + ": " + e.message);
+      }
+    }
+  }
+}
+
+// 2. FUNGSI PEMANGGIL (Ini yang didaftarkan ke Trigger Jam)
+function pemicuOtomatisQR() {
+  // Parameter: (NamaSheet, UrutanKolomNama, UrutanKolomID, PrefixBotPDF, UrutanKolomTargetQR)
+  
+  // Memproses Tabel Maintenance (Misal: Nama di Kolom B(2), ID di Kolom A(1), Target QR di Kolom F(6))
+  processTableQR("BILLING", 4, 1, "tagihan_", 14,17);
+  
+  // Memproses Tabel Tagihan (Misal: Nama di Kolom B(2), ID di Kotagihan_lom A(1), Target QR di Kolom G(7))
+  processTableQR("maintenance", 15, 1, "LKS_", 16,17);
+  
+  // Memproses Tabel Ketiga (Misal: Nama di Kolom C(3), ID di Kolom A(1), Target QR di Kolom E(5))
+  //processTableQR("Tabel_Log_Ketiga", 3, 1, "Log_", 5);
+}
+
+/**
+ * Fungsi simpan data yang disesuaikan dengan urutan kolom tabel log:
+ * A: key | B: modul_id | C: date | D: PROD_TOTAL | E: BILL_TOTAL | F: prod_harian | G: bill_harian | H: noMesin | I: last_update
+ */
+function simpanDataDariESP(p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetPerf = ss.getSheetByName("performa"); 
+  const sheetLog = ss.getSheetByName("log"); 
+  const stability = p.stability || 0;
+  const ppm = p.ppm || 0;
+  const sesiDur = p.sesi_dur || "00:00:00";
+  const sesiQty = p.sesi_qty || 0;
+  //if (!e || !e.parameter) {
+    //return ContentService.createTextOutput("ERROR: No Parameter").setMimeType(ContentService.MimeType.TEXT); //[cite: 20]
+  //}
+  
+  //const p = e.parameter;
+  const sekarang = new Date();
+  
+  // Format Tanggal dan Waktu
+  const tglID = Utilities.formatDate(sekarang, "GMT+7", "yyyy-MM-dd"); //[cite: 21]
+  const fullTime = Utilities.formatDate(sekarang, "GMT+7", "yyyy-MM-dd HH:mm:ss"); //[cite: 21]
+  const timestamp = Utilities.formatDate(sekarang, "GMT+7", "yyyy-MM-dd HH:mm:ss"); //[cite: 21]
+  
+  const snMesin = p.noMesin || p.mesin || p.id; //[cite: 22]
+  const keyUnik = tglID + "_" + snMesin; //[cite: 25]
+
+  // --- LOGIKA UPDATE ATAU INSERT KE TABEL 'log' ---
+  // Urutan array disesuaikan tepat dengan Kolom A sampai I pada gambar tabel log
+  const dataLengkapLog = [
+    keyUnik,               // Kolom A: key (Contoh: 2026-05-14_3289M330021) //[cite: 25]
+    p.modul_id || "ESP32", // Kolom B: modul_id //[cite: 26]
+    tglID,                 // Kolom C: date //[cite: 21]
+    p.prod_total || 0,     // Kolom D: # PROD_TOTAL //[cite: 27]
+    p.bill_total || 0,     // Kolom E: # BILL_TOTAL //[cite: 28]
+    p.prod_harian || 0,    // Kolom F: # prod_harian
+    p.bill_harian || 0,    // Kolom G: # bill_harian
+    snMesin,               // Kolom H: noMesin //[cite: 22]
+    timestamp              // Kolom I: last_update //[cite: 21]
+  ];
+
+  const dataLog = sheetLog.getDataRange().getValues(); //[cite: 29]
+  let barisDitemukan = -1;
+
+  // Cari apakah Key unik sudah ada di kolom A
+  for (let i = 0; i < dataLog.length; i++) {
+    if (dataLog[i][0] == keyUnik) {
+      barisDitemukan = i + 1; //[cite: 30]
+      break; //[cite: 31]
+    }
+  }
+
+  if (barisDitemukan !== -1) {
+    // Jika ada, update baris tersebut //[cite: 32]
+    sheetLog.getRange(barisDitemukan, 1, 1, dataLengkapLog.length).setValues([dataLengkapLog]);
+  } else {
+    // Jika tidak ada, tambah baris baru //[cite: 33]
+    sheetLog.appendRow(dataLengkapLog);
+  }
+
+  // --- SIMPAN KE TABEL 'performa' ---
+  // Sesuai gambar tabel performa: A: KEY (Full Time) | B: NO_MESIN | C: TANGGAL | D: SMALL | dst.
+  const dataPerf = [
+    fullTime,              // Kolom A: KEY (Timestamp lengkap) //[cite: 34]
+    snMesin,               // Kolom B: NO_MESIN //[cite: 34]
+    tglID,                 // Kolom C: TANGGAL //[cite: 34]
+    parseFloat(p.small) || 0,  // Kolom D: # SMALL //[cite: 34]
+    parseFloat(p.large) || 0,  // Kolom E: # LARGE //[cite: 34]
+    parseFloat(p.noise) || 0,  // Kolom F: # NOISE //[cite: 34]
+    parseFloat(p.jam) || 0,    // Kolom G: # JAM //[cite: 34]
+    parseFloat(p.gap) || 0,    // Kolom H: # GAP //[cite: 34]
+    parseFloat(p.door) || 0,    // Kolom I: # door //[cite: 34]
+    stability, // Kolom J
+    ppm,       // Kolom K
+    sesiDur    // Kolom L
+  ];
+  sheetPerf.appendRow(dataPerf); //[cite: 35]
+
+  return ContentService.createTextOutput("SUCCESS").setMimeType(ContentService.MimeType.TEXT); //[cite: 35]
+}
+
+
+/**
+ * 3. FUNGSI DATA DASHBOARD (Grafik & Widget)
+ */
+function ambilDataProduksi10Hari(idMesin) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetLog = ss.getSheetByName("log");
+  const dataLog = sheetLog.getDataRange().getValues();
+  const sheetReff = ss.getSheetByName("reff");
+  const dataReff = sheetReff.getDataRange().getValues();
+  
+  // 1. Ambil Parameter Konfigurasi dari Tabel Reff
+  let tglMulaiTagihan = 1;
+  let targetBulanan = 0;
+  let targetHarianManual = 0;
+  for (let j = 1; j < dataReff.length; j++) {
+    if (String(dataReff[j][0]) === String(idMesin)) { 
+      tglMulaiTagihan = new Date(dataReff[j][14]).getDate(); // Kolom O
+      targetBulanan = Number(dataReff[j][12]) || 0;         // Kolom M (Target Minimal)
+      targetHarianManual = (Number(dataReff[j][18]) || 0) / 25;
+      break;
+    }
+  }
+
+  // 2. Tentukan Rentang Periode Berjalan
+  const sekarang = new Date();
+  let tglAwalPeriode = new Date(sekarang.getFullYear(), sekarang.getMonth(), tglMulaiTagihan);
+  if (sekarang.getDate() < tglMulaiTagihan) {
+    tglAwalPeriode.setMonth(tglAwalPeriode.getMonth() - 1);
+  }
+
+  // 3. Kelompokkan bill_harian per tanggal dalam periode ini
+  let mapHarian = {};
+  for (let i = 1; i < dataLog.length; i++) {
+    let tglLog = new Date(dataLog[i][2]); // Kolom C
+    if (String(dataLog[i][7]) === String(idMesin) && tglLog >= tglAwalPeriode && tglLog <= sekarang) {
+      let key = Utilities.formatDate(tglLog, "GMT+7", "yyyy-MM-dd");
+      mapHarian[key] = (mapHarian[key] || 0) + (Number(dataLog[i][6]) || 0); // Kolom G (bill_harian)
+    }
+  }
+
+  // 4. Hitung Akumulasi (Total Bill Periode) dan Siapkan Label X
+  let labelsX = [];
+  let dataAkumulasiY = [];
+  let runningTotal = 0;
+  let sortedDates = Object.keys(mapHarian).sort();
+  
+  sortedDates.forEach(dateKey => {
+    let pemakaianHariIni = mapHarian[dateKey];
+    runningTotal += pemakaianHariIni;
+    
+    let tglObj = new Date(dateKey);
+    // Label X: "Tgl (Jumlah Harian)" -> Contoh: "12 Mei (450)"
+    let labelX = Utilities.formatDate(tglObj, "GMT+7", "dd MMM") + " (" + pemakaianHariIni + ")";
+    
+    labelsX.push(labelX);
+    dataAkumulasiY.push(runningTotal);
+  });
+
+  // Data tambahan untuk widget
+  let totalProd = 0, totalBill = 0, billToday = 0;
+  if (dataLog.length > 1) {
+    for (let i = dataLog.length - 1; i >= 1; i--) {
+      if (String(dataLog[i][7]) === String(idMesin)) {
+        totalProd = dataLog[i][3];
+        totalBill = dataLog[i][4];
+        billToday = dataLog[i][6];
+        break;
+      }
+    }
+  }
+
+  return {
+    labels: labelsX,
+    dataBill: dataAkumulasiY,
+    target: targetBulanan,
+    targetDay: targetHarianManual,
+    lifetimeProd: totalProd,
+    lifetimeBill: totalBill,
+    billHarianLog: billToday
+  };
+}
+
+/**
+ * 4. FUNGSI HELPER IDENTITAS
+ */
+function getIdentitasMesin(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("reff");
+  const data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      return { pelanggan: data[i][1], tipe: data[i][2], ideal: data[i][18] };
+    }
+  }
+  return { pelanggan: "Guest", tipe: "-", ideal: 0 };
+}
+
+/**
+ * FUNGSI MENGAMBIL DATA MAINTENANCE & HISTORI (PERBAIKAN SUMBER TABEL)
+ * - Widget Atas: Mengambil dari log performa ESP32
+ * - Tabel Histori Bawah: Mengambil murni dari tabel 'maintenance'
+ */
+
+//////
+function ambilDataMaintenance(idMesin) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetPerf = ss.getSheetByName("performa") || ss.getSheetByName("log"); 
+    const sheetMaint = ss.getSheetByName("maintenance"); 
+    const sheetLog = ss.getSheetByName("log");
+    
+    var dataLog = sheetLog.getDataRange().getValues();
+    let stability = 0;
+    let stabilityHarian = 0; 
+    let ppm = 0;
+    let jamRate = 0;
+    var billCounterTerakhir = 0;
+    
+    // ========================================================
+    // 1. AMBIL DATA COUNTER TERAKHIR (DARI LOG)
+    // ========================================================
+    for (var i = dataLog.length - 1; i >= 1; i--) {
+      if (String(dataLog[i][7]).trim() == String(idMesin).trim()) { 
+        billCounterTerakhir = dataLog[i][4]; // Kolom E (Indeks Kolom ke-5)
+        break; 
+      }
+    }
+    
+    // Ambil tanggal hari ini
+    const hariIniStr = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
+    
+    // ========================================================
+    // 2. AMBIL DATA REAL-TIME & HARIAN (UNTUK GRAFIK MAINTENANCE)
+    // ========================================================
+    if (sheetPerf) {
+      const dataPerf = sheetPerf.getDataRange().getValues();
+      if (dataPerf.length > 1) {
+        let matchCount = 0;
+        let sumStability = 0;
+        let sumJam = 0;
+        let matchCountHarian = 0;
+        let sumStabilityHarian = 0;
+        
+        for (let i = dataPerf.length - 1; i >= 1; i--) {
+          if (String(dataPerf[i][1]).trim() === String(idMesin).trim() || String(dataPerf[i][1]).trim() === String(idMesin).trim()) {
+            if (matchCount < 3) {
+              if (matchCount === 0) {
+                ppm = Number(dataPerf[i][10]) || 0; 
+                stability = Number(dataPerf[i][9]) || 0;
+              }
+              sumStability += (Number(dataPerf[i][9]) || 95); 
+              sumJam += (Number(dataPerf[i][6]) || 0);      
+              matchCount++;
+            }
+            
+            let tglLog = dataPerf[i][0]; 
+            if (tglLog instanceof Date) {
+              let tglLogStr = Utilities.formatDate(tglLog, "GMT+7", "yyyy-MM-dd");
+              if (tglLogStr === hariIniStr) {
+                sumStabilityHarian += (Number(dataPerf[i][9]) || 95);
+                matchCountHarian++;
+              }
+            }
+          }
+        }
+        if (matchCount > 0) {
+          stability = Math.round(sumStability / matchCount);
+          jamRate = ((sumJam / matchCount) * 100).toFixed(1);
+        }
+        if (matchCountHarian > 0) {
+          stabilityHarian = Math.round(sumStabilityHarian / matchCountHarian);
+        } else {
+          stabilityHarian = stability || 100;
+        }
+      }
+    }
+
+    // ========================================================
+    // 3. AMBIL DATA HISTORI (MURNI DARI TABEL MAINTENANCE)
+    // ========================================================
+    let gabunganHistori = [];
+    
+    if (sheetMaint) {
+      const dataMaint = sheetMaint.getDataRange().getValues();
+      if (dataMaint.length > 1) {
+        let count = 0;
+        
+        for (let j = dataMaint.length - 1; j >= 1; j--) {
+          // Pengecekan ID Mesin di Kolom A (Index 0)
+          if (String(dataMaint[j][1]).trim() === String(idMesin).trim()) {
+            
+            let statusTiket = String(dataMaint[j][10]).toUpperCase().trim() || "OPEN"; // Kolom K (Index 10)
+            let tglTampilan = "-";
+            let picAktivitas = "-";
+            let jenisTindakan = "-";
+            let deskripsiAktivitas = "-";
+            
+            if (statusTiket === "OPEN") {
+              tglTampilan = dataMaint[j][2] ? Utilities.formatDate(new Date(dataMaint[j][2]), "GMT+7", "dd-MM-yyyy HH:mm") : "-";
+              picAktivitas = dataMaint[j][3] || "Operator"; 
+              jenisTindakan = "PANGGILAN URGENT";
+              deskripsiAktivitas = "🚨 KELUHAN: " + (dataMaint[j][4] || "-"); 
+            } else {
+              tglTampilan = dataMaint[j][5] ? Utilities.formatDate(new Date(dataMaint[j][5]), "GMT+7", "dd-MM-yyyy HH:mm") : "-"; 
+              picAktivitas = dataMaint[j][7] || "Teknisi"; 
+              jenisTindakan = (dataMaint[j][8] || "PERBAIKAN").toUpperCase(); 
+              deskripsiAktivitas = "🛠️ " + (dataMaint[j][9] || "-"); 
+            }
+            
+            // STRUKTUR SUPER GABUNGAN: 
+            // Memasukkan semua nama variabel yang dicari oleh halaman lama & baru sekaligus
+            gabunganHistori.push({
+              waktu: tglTampilan,
+              status: statusTiket,
+              keterangan: deskripsiAktivitas,
+              
+              // Kunci variabel untuk halaman service.html yang baru
+              operator: picAktivitas,
+              kategori: jenisTindakan,
+              
+              // Kunci variabel asli untuk halaman maintenance.html yang lama
+              pic: picAktivitas,
+              aktivitas: jenisTindakan
+            });
+            
+            count++;
+            if (count >= 20) break; // Kuota dinaikkan agar tabel histori lama terisi penuh
+          }
+        }
+      }
+    }
+
+    // ========================================================
+    // 4. RETURN PAKET DATA GLOBAL SUPER LENGKAP
+    // ========================================================
+    return {
+      success: true,
+      billCounter: billCounterTerakhir,      // Dicari oleh panel service
+      bill_counter: billCounterTerakhir,     // Duplikasi fail-safe
+      stability: stability || 100,           // Dicari grafik radar/gauge
+      stabilityHarian: stabilityHarian,       // Dicari grafik harian
+      ppm: ppm,                              // Dicari gauge PPM
+      jamRate: jamRate || 0,                 // Dicari gauge Jam Kerja
+      histori: gabunganHistori               // Array tunggal yang menyelamatkan kedua halaman!
+    };
+    
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+function hitungTagihanBulanan(idMesin) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetLog = ss.getSheetByName("log");
+  const sheetReff = ss.getSheetByName("reff");
+  const dataReff = sheetReff.getDataRange().getValues();
+  
+  let config = {};
+  // Mengambil konfigurasi dari tabel reff 
+  for (let i = 1; i < dataReff.length; i++) {
+    if (String(dataReff[i][0]).trim() == String(idMesin).trim()) {
+      config = { 
+        hTgl: new Date(dataReff[i][14]).getDate(), // Tanggal mulai di kolom O 
+        min: Number(dataReff[i][12]) || 0,        // Minimal kuota di kolom M 
+        cost: Number(dataReff[i][13]) || 0         // Cost per clik di kolom N 
+      };
+      break;
+    }
+  }
+  
+  if (!config.hTgl) return { success: false };
+
+  // Menentukan rentang tanggal periode berjalan 
+  const skr = new Date();
+  let tglM = new Date(skr.getFullYear(), skr.getMonth(), config.hTgl);
+  if (skr.getDate() < config.hTgl) tglM.setMonth(tglM.getMonth() - 1);
+  const tglA = new Date(tglM);
+  tglA.setMonth(tglA.getMonth() + 1);
+
+  // Menghitung akumulasi billing_harian dari tabel log (Kolom G) [cite: 94, 95]
+  const logs = sheetLog.getDataRange().getValues();
+  let totalBillPeriode = 0;
+  for (let j = 1; j < logs.length; j++) {
+    let tglLog = new Date(logs[j][2]); // Kolom C [cite: 94]
+    if (String(logs[j][7]).trim() == String(idMesin).trim() && tglLog >= tglM && tglLog < tglA) {
+      totalBillPeriode += (Number(logs[j][6]) || 0); // Akumulasi dari bill_harian 
+    }
+  }
+
+  // Menghitung cliks yang harus dibayar 
+  let selisih = totalBillPeriode - config.min;
+  let totalRupiah = selisih > 0 ? selisih * config.cost : 0;
+
+  return {
+    success: true,
+    total: totalRupiah,
+    qty: totalBillPeriode,
+    min: config.min,
+    cost: config.cost,
+    periode: Utilities.formatDate(tglM, "GMT+7", "dd MMM") + " - " + Utilities.formatDate(tglA, "GMT+7", "dd MMM yyyy")
+  };
+}
+function buatPanggilanTeknisi(dataPanggil) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("maintenance"); 
+    
+    if (!sheet) return { success: false, message: "Sheet 'maintenance' tidak ditemukan" };
+    
+    const dataMaint = sheet.getDataRange().getValues();
+    const headers = dataMaint[0];
+    
+    const idxNoMesin = headers.indexOf("No_Mesin"); 
+    const idxStatus = headers.indexOf("status");     
+    
+    // 1. CEK APAKAH ADA TIKET 'OPEN' UNTUK MESIN INI
+    if (idxNoMesin !== -1 && idxStatus !== -1) {
+      for (let i = dataMaint.length - 1; i >= 1; i--) {
+        var mesinDiSheet = String(dataMaint[i][idxNoMesin]).trim();
+        var statusDiSheet = String(dataMaint[i][idxStatus]).toUpperCase().trim();
+        
+        if (mesinDiSheet === String(dataPanggil.noMesin).trim() && statusDiSheet === "OPEN") {
+          // JIKA OPEN: Kembalikan instruksi kirim WA langsung tanpa tulis data ke spreadsheet
+          return { 
+            success: true, 
+            statusTiket: "OPEN", 
+            message: "Masih ada tiket OPEN! Menghubungkan langsung ke WhatsApp Kantor..." 
+          };
+        }
+      }
+    }
+    
+    // 2. JIKA TIDAK ADA TIKET OPEN: TULIS BARIS BARU KE TABEL MAINTENANCE
+    var waktuSekarangWIB = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
+    
+    sheet.appendRow([
+      "TCK-" + new Date().getTime(), // Kolom A: ID TIKET
+      dataPanggil.noMesin,           // Kolom B: No Mesin
+      waktuSekarangWIB,              // Kolom C: Waktu Panggil
+      dataPanggil.pelapor,           // Kolom D: Pelapor
+      dataPanggil.keluhan,           // Kolom E: Keluhan
+      "",                            // Kolom F: Waktu Tiba
+      "",                            // Kolom G: Waktu Selesai
+      "",                            // Kolom H: Nama Teknisi
+      "",                            // Kolom I: Jenis Tindakan
+      "",                           // Kolom J: keterangan
+      "OPEN",                       // Kolom K: Status Awal Tiket
+      dataPanggil.billCounter,
+      "",
+      "Cetak",
+      dataPanggil.pelangganServer || "Urgent",
+      dataPanggil.foto1 || "",
+      dataPanggil.foto2 || ""
+    ]);
+    const pesanWA =
+  "🚨 SMARTCountPro ALERT 🚨\n\n" +
+  "Mesin : " + dataPanggil.noMesin + "\n" +
+  "Pelanggan : " + (dataPanggil.pelangganServer || "-") + "\n" +
+  "Pelapor : " + dataPanggil.pelapor + "\n" +
+  "Keluhan : " + dataPanggil.keluhan + "\n\n" +
+  "Foto : " + (dataPanggil.foto1 || "-") + "\n\n" +
+  "Status : OPEN";
+
+  kirimWAAdmin(pesanWA);                
+    
+    return { 
+      success: true, 
+      statusTiket: "BARU", 
+      message: "Tiket baru berhasil dicatat! Membuka WhatsApp untuk kirim notifikasi..." 
+
+    };
+    
+  } catch (err) {
+    return { success: false, message: "Error Server: " + err.toString() };
+  }
+}
+function tesWA2(){
+  kirimWAAdmin("TEST dari createTicket");
+}
+function kirimWAAdmin(pesan){
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const sh=ss.getSheetByName("dummy");
+  const data=sh.getDataRange().getValues();
+  const noAdmin=  String(data[1][3] || "")
+      .replace(/\D/g,'');
+      Logger.log("WA_ADMIN= "+ noAdmin);
+      Logger.log("PESAN = " + pesan);
+  const response = UrlFetchApp.fetch(
+    "https://api.fonnte.com/send",
+    {
+      method:"post",
+      headers:{
+        "Authorization":"9TbK7ULbPvzDVdHcs1Ai"
+      },
+      payload:{
+        target:noAdmin,
+        message:pesan
+      },
+      muteHttpExceptions:true
+    }
+  );
+
+  Logger.log(response.getContentText());
+
+}
+function tesWAAdminDummy(){
+
+  kirimWAAdmin(
+    "🚀 TEST WA_ADMIN dari tabel dummy"
+  );
+
+}
+
+
+/**
+ * 2. UPDATE PEKERJAAN TEKNISI SAAT SELESAI - OTOMATIS WAKTU SEKARANG (WIB)
+ */
+function catatKedatanganTeknisi(dataForm) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("maintenance");
+    if (!sheet) return { success: false, message: "Error: Sheet maintenance tidak ditemukan!" };
+    
+    const data = sheet.getDataRange().getValues();
+    let rowDiperbarui = -1;
+    
+    // Cari baris OPEN terakhir yang cocok dengan nomor mesin
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][1]).trim() === String(dataForm.noMesin).trim() && String(data[i][10]).toUpperCase() === "OPEN") {
+        rowDiperbarui = i + 1; 
+        break;
+      }
+    }
+    
+    if (rowDiperbarui !== -1) {
+      let waktuSekarang = new Date();
+      
+      sheet.getRange(rowDiperbarui, 6).setValue(waktuSekarang);
+      sheet.getRange(rowDiperbarui, 9).setValue("Remote");       
+      sheet.getRange(rowDiperbarui, 10).setValue("Mesin dapat beroperasi kembali, dijadwalkan kunjungan");    
+      sheet.getRange(rowDiperbarui, 11).setValue("DELAY");      // Kolom K: Waktu Tindakan
+
+      return { success: true, message: "🚨 Jam kedatangan berhasil dikunci! Selamat bekerja." };
+    } else {
+      return { success: false, message: "Tidak ditemukan panggilan OPEN untuk mesin ini." };
+    }
+  } catch(err) {
+    return { success: false, message: "Gagal: " + err.toString() };
+  }
+}
+function selesaikanTindakanTeknisi(dataForm) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("maintenance");
+    if (!sheet) return { success: false, message: "Error: Sheet 'maintenance' tidak ditemukan!" };
+    
+    const data = sheet.getDataRange().getValues();
+    let rowDiperbarui = -1;
+    
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][1]).trim() === String(dataForm.noMesin).trim() && (data[i][10] === "OPEN" || data[i][10] === "DELAY")) {
+        rowDiperbarui = i + 1; 
+        break;
+      }
+    }
+    
+    // AMBIL WAKTU SEKARANG DIKUNCI KE GMT+7 (WIB)
+    let formatWIB = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
+    // Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd'T'HH:mm:ss");
+    // Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
+    let waktuSekarangWIB = new Date(formatWIB);
+    let nilaiBill = dataForm.billCounter //!== undefined ? dataForm.bill_counter : ""; //zn
+    if (rowDiperbarui !== -1) {
+      // Jika ditemukan tiket panggilan yang 'OPEN'
+      // Karena pengisian otomatis saat klik tombol, maka Waktu Tiba Teknisi & Waktu Selesai dianggap sama dengan waktu klik simpan ini
+      //sheet.getRange(rowDiperbarui, 6).setValue(waktuSekarangWIB); // Kolom F: Waktu Tiba/Tindakan
+      sheet.getRange(rowDiperbarui, 7).setValue(waktuSekarangWIB); // Kolom G: Waktu Selesai
+      sheet.getRange(rowDiperbarui, 8).setValue(dataForm.namaTeknisi);
+      sheet.getRange(rowDiperbarui, 9).setValue(dataForm.jenisTindakan);
+      sheet.getRange(rowDiperbarui, 10).setValue(dataForm.keterangan);
+      sheet.getRange(rowDiperbarui, 11).setValue("RESOLVED");
+      sheet.getRange(rowDiperbarui, 12).setValue(dataForm.billCounter); //zn
+      sheet.getRange(rowDiperbarui, 15).setValue(dataForm.pelangganServer || "Monitor");
+      
+      return { success: true, message: "Log pemeliharaan disimpan. Tiket berhasil diselesaikan (RESOLVED)." };
+    } else {
+      // Jika murni maintenance rutin/preventif tanpa panggilan 'OPEN' sebelumnya
+        sheet.appendRow([
+        "TCK-" + new Date().getTime(),
+        dataForm.noMesin,
+        "", //waktuSekarangWIB,                 // Kolom C: Waktu Panggil
+        "Sistem",                         // Kolom D: Pelapor
+        "Maintenance",                    // Kolom E: Keluhan
+        waktuSekarangWIB,                 // Kolom F: Waktu Tiba
+        waktuSekarangWIB,                 // Kolom G: Waktu Selesai
+        dataForm.namaTeknisi,             // Kolom H
+        dataForm.jenisTindakan,           // Kolom I
+        dataForm.keterangan,              // Kolom J
+        "RESOLVED",                        // Kolom K
+        dataForm.billCounter,                     //belum berhasilzn
+        "",
+        "cetak",
+        dataForm.pelangganServer
+      ]);
+      return { success: true, message: "Log tindakan preventif berhasil dicatat langsung (RESOLVED)." };
+    }
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+/**
+ * 1. Fungsi Matematika Hitung Jarak (Haversine Formula) - Satuan METER
+ */
+function hitungJarakHaversine(lat1, lon1, lat2, lon2) {
+  try {
+    const R = 6371000; // Jari-jari bumi dalam meter
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; 
+  } catch (err) {
+    return 999999; // Fail-safe jika error jarak dibuat jauh agar ditolak
+  }
+}
+
+/**
+ * 2. Fungsi Memeriksa Status Kolom Q pada Tabel "reff"
+ */
+function cekAtauSimpanKoordinatMesin(idMesin, koordinatBaru) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetReff = ss.getSheetByName("reff");
+    if (!sheetReff) return { status: "ERROR", pesan: "Tabel 'reff' tidak ditemukan" };
+    
+    var data = sheetReff.getDataRange().getValues();
+    var idxKolomQ = 16; // Kolom Q (A=0, B=1, ... Q=16)
+    
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(idMesin).trim()) {
+        var koordinatLama = data[i][idxKolomQ];
+        
+        // Skenario 1: Jika diperintahkan untuk menyimpan data baru ke kolom Q yang kosong
+        if (koordinatBaru && (!koordinatLama || koordinatLama.toString().trim() === "")) {
+          sheetReff.getRange(i + 1, idxKolomQ + 1).setValue(koordinatBaru);
+          SpreadsheetApp.flush(); // Paksa Google Sheets untuk langsung mengunci data detik itu juga
+          return { status: "TERISI", data: koordinatBaru };
+        }
+        
+        // Skenario 2: Murni pengecekan awal di awal klik tombol panggil
+        if (!koordinatLama || koordinatLama.toString().trim() === "") {
+          return { status: "KOSONG" };
+        } else {
+          return { status: "TERISI", data: koordinatLama.toString() };
+        }
+      }
+    }
+    return { status: "NOT_FOUND", pesan: "ID Mesin tidak ditemukan" };
+  } catch (err) {
+    return { status: "ERROR", pesan: err.toString() };
+  }
+}
+
+
+
+
+/**
+ * 3. Fungsi Validasi Jarak Teknisi (Maksimal 200 Meter)
+ */
+function validasiJarakTeknisi(idMesin, latTeknisi, lonTeknisi) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetReff = ss.getSheetByName("reff");
+    const data = sheetReff.getDataRange().getValues();
+    const idxKolomQ = 16;
+    
+    let koordinatMesin = "";
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(idMesin).trim()) {
+        koordinatMesin = data[i][idxKolomQ];
+        break;
+      }
+    }
+    
+    // Jika koordinat acuan mesin belum diset, anggap lolos (atau preventif awal)
+    if (!koordinatMesin || koordinatMesin.toString().trim() === "") {
+      return { lolos: true, catatan: "Koordinat acuan mesin belum terdaftar." };
+    }
+    
+    // Pecah string "lat, lon" dari kolom Q
+    let parts = koordinatMesin.toString().split(",");
+    let latMesin = parseFloat(parts[0].trim());
+    let lonMesin = parseFloat(parts[1].trim());
+    
+    // Hitung jarak murni menggunakan Haversine
+    let jarakMeter = hitungJarakHaversine(latTeknisi, lonTeknisi, latMesin, lonMesin);
+    
+    if (jarakMeter <= 200) {
+      return { lolos: true, jarak: Math.round(jarakMeter) };
+    } else {
+      return { lolos: false, jarak: Math.round(jarakMeter) };
+    }
+  } catch (err) {
+    return { lolos: false, catatan: "Gagal menghitung geofence: " + err.toString() };
+  }
+}
+
+
+
+

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Progress Ticket</title>
+
+<style>
+body{
+  background:#0d1117;
+  color:white;
+  font-family:Consolas,monospace;
+  margin:0;
+  padding:20px;
+}
+
+.card{
+  max-width:700px;
+  margin:auto;
+  background:#6d747e;
+  border:1px solid #30363d;
+  border-radius:12px;
+  padding:20px;
+}
+
+h2{
+  text-align:center;
+  color:#3fb950;
+}
+
+.status{
+  margin-top:20px;
+  padding:15px;
+  border-radius:8px;
+  background:#0d1117;
+  border:1px solid #30363d;
+}
+
+.label{
+  color:#58a6ff;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>PROGRESS TICKET</h2>
+
+<div class="status">
+  <div class="label">No Ticket</div>
+  <div id="ticketId">Loading...</div>
+</div>
+
+<div class="status">
+  <div class="label">Status</div>
+  <div>OPEN</div>
+</div>
+
+<div class="status">
+  <div class="label">Teknisi</div>
+  <div>Belum ditugaskan</div>
+</div>
+
+<div class="status">
+  <div class="label">Keterangan</div>
+  <div>Menunggu teknisi mengambil tiket</div>
+</div>
+
+</div>
+
+<script>
+
+const params =
+new URLSearchParams(
+  window.location.search
+);
+
+document.getElementById(
+  "ticketId"
+).innerText =
+params.get("ticketId") || "-";
+
+</script>
+
+</body>
+</html>

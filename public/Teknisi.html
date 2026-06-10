@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport"
+        content="width=device-width,initial-scale=1"
+        >
+<title>SMARTCP TEKNIK</title>
+<style>
+    body{
+        background:#0d1117;
+        color: white;
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+    }
+    .card{
+        width: 320px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    h2{
+        text-align: center;
+        color: #3fb950;
+    }
+    select,button{
+        width: 100%;
+        padding: 12px;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+    button{
+        background: #3fb950;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+</style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>Service Level Agreement</h2>
+                <select id="teknisi">
+                    <option>Loading...</option>
+                    </select>
+                    <button onclick="loginTeknisi()">
+                        MASUK
+                    </button>
+            </div>
+            <div id="ticketList"></div>
+            <script>
+const WEBAPP=
+"https://script.google.com/macros/s/AKfycbwh4Da16mogjt_abC-CMvY-eOK2BUyeUEhgXstMqB2gQ4kbgNsx0XFB_adMqnfujumn/exec";
+async function loadTeknisi(){
+    const res=
+    await fetch(WEBAPP+"?action=getTeknisi"
+    );
+    const data=
+    await res.json();
+    const select=
+    document.getElementById("teknisi");
+    select.innerHTML ="";
+    data.teknisi.forEach(t=>{
+        select.innerHTML += `
+        <option value="${t.id}">
+            ${t.nama}
+            </option>
+            `;
+    });
+
+}
+function loginTeknisi(){
+    const select = 
+    document.getElementById("teknisi");
+    const id = select.value;
+    const nama = select.options[
+        select.selectedIndex
+    ].text;
+    localStorage.setItem("id_teknisi",id);
+    localStorage.setItem("nama_teknisi",nama);
+    alert("Selamat Datang "+nama);    
+}
+window.onload = () => {
+loadTeknisi();
+loadOpenTicket();
+};
+const idTeknisi = 
+localStorage.getItem("id_teknisi");
+const namaTeknisi = 
+localStorage.getItem("nama_teknisi");
+if(idTeknisi){
+    alert("Anda sudah login sebagai "+namaTeknisi);
+}
+async function loadOpenTicket(){
+    const res = await fetch(
+        WEBAPP+"?action=getOpenTicket"
+    );
+    const hasil = await res.json();
+    console.log(hasil);
+    let html = "";
+    hasil.data.forEach(t=>{
+        html += `
+        <div class ="card">
+            <h3> ${t.ticketId}</h3>
+            <p>
+                <b>${t.pelanggan}</b>
+                </P>
+                <p>${t.keluhan}</p>
+                <button onclick="ambilTicket('${t.ticketId}')">
+                    AMBIL
+                </button>
+            </div>
+        `;
+    });
+    document.getElementById("ticketList").innerHTML = html;
+    }
+    async function ambilTicket(ticketId){
+        const idTeknisi = localStorage.getItem("id_teknisi");
+        const namaTeknisi = localStorage.getItem("nama_teknisi");
+        const res = await fetch(WEBAPP+
+        "?action=ambilTicket"+
+        "&ticketId="+ticketId+
+        "&idTeknisi="+idTeknisi+
+        "&namaTeknisi="+
+        encodeURIComponent(namaTeknisi));
+        console.log(url);
+        window.open(url,"_blank");
+        return;
+        const data = await res.json();
+        alert(data.message);
+        loadOpenTicket();
+    }
+           </script>
+        </body>
+</html>

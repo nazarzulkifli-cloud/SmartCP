@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Maintenance & Monitoring Produksi v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        
+        /* Gaya Semi-Circle Gauge Menggunakan CSS Murni */
+        .gauge-wrapper { position: relative; width: 140px; height: 70px; overflow: hidden; }
+        .gauge-body { position: absolute; top: 0; left: 0; width: 140px; height: 140px; border-radius: 50%; border: 18px solid #e2e8f0; transform: rotate(0deg); transition: transform 0.5s ease; }
+        
+        /* Default Color Ring */
+        .gauge-color-fill { border-bottom-color: #2563eb !important; border-right-color: #2563eb !important; }
+    </style>
+</head>
+<body class="p-6 text-slate-800">
+    <button type="button" onclick="kembaliKeDashboard()" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95">
+        <i class="fa-solid fa-arrow-left text-sm"></i> Kembali
+    </button>
+   <div class="max-w-[1600px] mx-auto mb-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+   
+
+
+        <div>
+            <span class="px-3 py-1 text-xs font-bold bg-blue-100 text-blue-700 rounded-full uppercase tracking-wider">Layanan Prioritas</span>
+            <h1 class="text-3xl font-bold text-slate-900 mt-1">Service Level Agreement</h1>
+            <p class="text-sm text-slate-500">
+                SN MESIN: <span class="text-blue-600 font-bold" id="txtIdMesin"><?= idMesinServer ?></span> |
+                CLIENT: <span class="text-blue-600 font-bold" id="txtNamaPelanggan"><?= pelangganServer ?></span>
+            </p>
+        </div>
+        
+        
+
+      
+    
+    <div class="flex flex-col items-center justify-center p-2 text-center bg-blue-50/30 rounded-xl border border-blue-100/50">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Billing Terakhir</span>
+        <div class="flex items-baseline gap-1 my-2">
+            <span class="text-3xl font-black text-red-600" id="lblCounterTerakhir">0</span>
+        </div>
+        <p class="text-[10px] text-slate-400 font-medium bg-white px-2 py-0.5 rounded-full border border-slate-100">Billing Log Unit</p>
+    </div>
+
+
+    </div>
+
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-4 bg-cyan-400 p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 border-b border-slate-100 pb-4 mb-4">
+                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i class="fa-solid fa-user-gear text-xl"></i></div>
+                    <h2 class="text-lg font-bold text-slate-900">LEMBAR KERJA SERVICE</h2>
+                </div>
+                
+                <form id="formMaintenance" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Teknisi</label>
+                        <input type="text" id="inputTeknisi" placeholder="Masukkan nama lengkap teknisi" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jenis Tindakan</label>
+                        <select id="inputJenis" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm font-medium">
+                            <option value="Service">Service (Korektif/Kerusakan)</option>
+                            <option value="Preventif">Preventif (Perawatan Rutin)</option>
+                            <option value="Kalibrasi">Kalibrasi (Stabilitas Sensor)</option>
+                            <option value="Ganti Part">Ganti Part (Suku Cadang)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keterangan Tindakan</label>
+                        <textarea id="inputKeterangan" rows="4" placeholder="Detail pekerjaan, part yang diganti, atau catatan mekanis..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm"></textarea>
+                    </div>
+                </form>
+            </div>
+
+            <button type="button" onclick="simpanLogTeknisi()" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-all active:scale-[0.98]">
+                Simpan LKS
+            </button>
+
+            
+         
+            <button id="btnPanggilTeknisi" onclick="bukaModalPanggil()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center gap-3 text-sm active:scale-95">
+                <i class="fa-solid fa-bell text-lg animate-pulse"></i>
+                <span>PANGGIL TEKNISI PRIORITY</span>
+            </button>
+        
+
+        </div>
+
+        <div class="lg:col-span-8 flex flex-col gap-6">
+            
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                
+                <div class="flex flex-col items-center justify-center p-2 border-r border-slate-100 last:border-none">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Stabilitas /Batch</span>
+                    <div class="gauge-wrapper">
+                        <div id="gaugeBodyRing" class="gauge-body gauge-color-fill"></div>
+                        <div class="absolute inset-0 flex items-end justify-center pb-1">
+                            <span class="text-2xl font-bold text-slate-900" id="lblStability">0%</span>
+                        </div>
+                    </div>
+                    <span id="lblStatusStab" class="text-[11px] font-semibold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">Presisi Optimal</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-2 border-r border-slate-100 last:border-none text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Stabilitas Harian</span>
+                    <div class="gauge-wrapper">
+                        <div id="gaugeBodyRingHarian" class="gauge-body gauge-color-fill"></div>
+                        <div class="absolute inset-0 flex items-end justify-center pb-1">
+                            <span class="text-2xl font-bold text-slate-900" id="lblStabHarian">0%</span>
+                        </div>
+                    </div>
+                    <span class="text-[11px] font-semibold text-slate-500 mt-2 bg-slate-50 px-2 py-0.5 rounded-full">Akumulasi Hari Ini</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-2 border-r border-slate-100 last:border-none text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Speed /Batch</span>
+                    <div class="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
+                        <canvas id="speedometerCanvas" width="180" height="100" class="absolute top-0 left-0"></canvas>
+                        <div class="absolute bottom-0 text-center">
+                            <span class="text-2xl font-extrabold text-slate-900" id="lblPpm">0</span> 
+                            <span class="text-[10px] font-bold text-slate-400 block -mt-1">PPM</span>
+                        </div>
+                    </div>
+                    <span class="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full mt-1">Max 150 PPM</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-2 last:border-none text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rasio Macet (Jam)</span>
+                    <div class="flex items-baseline gap-1 my-2">
+                        <span class="text-4xl font-extrabold text-red-500" id="lblJamRate">0.0<span class="text-lg font-bold">%</span></span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Toleransi Batas &lt; 2%</p>
+                </div>
+
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-slate-200 text-slate-700 rounded-lg"><i class="fa-solid fa-list-check"></i></div>
+                        <h2 class="text-lg font-bold text-slate-900">Histori Aktivitas</h2>
+                    </div>
+                     <button type="button" id="btnKedatangan" onclick="klikCatatKedatangan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md">
+                      <i class="fa-solid fa-user-check"></i> PENANGANAN TEKNISI
+                     </button>
+                   
+                </div>
+                
+                <div class="overflow-x-auto flex-grow">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                <th class="p-4">Waktu / Tanggal</th>
+                                <th class="p-4">Nama</th>
+                                <th class="p-4">Tindakan</th>
+                                <th class="p-4">Keterangan</th>
+                                <th class="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm" id="tabelHistoriBody">
+                            <tr>
+                                <td colspan="5" class="p-4 text-center text-gray-400 italic">Memuat data histori...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="modalPanggil" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden transform scale-95 transition-all duration-300">
+            <div class="p-6 border-b border-slate-100 bg-red-50 flex justify-between items-center">
+                <div class="flex items-center gap-3 text-red-700">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    <h3 class="text-lg font-bold">Form Panggilan Urgent Layanan</h3>
+                </div>
+                <button onclick="tutupModalPanggil()" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal & Waktu Panggil</label>
+                    <input type="datetime-local" id="panggilWaktu" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white transition-all text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nama Pelapor / Operator</label>
+                    <input type="text" id="panggilPelapor" placeholder="Nama operator mesin yang bertugas" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white transition-all text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Keluhan Mesin (Macet / Kendala Sensor)</label>
+                    <textarea id="panggilKeluhan" rows="3" placeholder="Deskripsikan indikasi kerusakan secara ringkas..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white transition-all text-sm"></textarea>
+                </div>
+            </div>
+            <div class="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 justify-end">
+                <button onclick="tutupModalPanggil()" class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 transition-all text-sm">Batal</button>
+                <button onclick="kirimPanggilanUrgent()" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md shadow-red-600/10 transition-all text-sm">Kirim Panggilan Ke Tabel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const idMesinGlobal = document.getElementById("txtIdMesin").innerText;
+        const namaPelangganGlobal = document.getElementById("txtNamaPelanggan").innerText;
+        
+        const nomorHpKantorDinamis = (typeof noHpKantorServer !== 'undefined') ? "<?= noHpKantorServer ?>" : "62818903113";
+        let currentBillCounterValue = 0; 
+
+        window.onload = function() {
+            const sekarang = new Date().toISOString().slice(0, 16);
+            document.querySelectorAll('input[type="datetime-local"]').forEach(el => el.value = Pediatric = sekarang);
+            
+            refreshDataMaintenance();
+            setInterval(refreshDataMaintenance, 30000); 
+        };
+
+        function refreshDataMaintenance() {
+            if(!idMesinGlobal) return;
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    console.log("Data dari Server:", res);
+                    if(res.success) {
+                        const gaugeRing = document.getElementById("gaugeBodyRing");
+                        const gaugeRingHarian = document.getElementById("gaugeBodyRingHarian");
+                        const labelStab = document.getElementById("lblStatusStab");
+
+                        document.getElementById("lblJamRate").innerText = res.jamRate + "%";
+                        document.getElementById("lblStability").innerText = res.stability + "%";
+                        document.getElementById("lblStabHarian").innerText = (res.stabilityHarian||0) + "%";
+                        
+                        currentBillCounterValue = res.billCounter || 0; 
+                        document.getElementById("lblCounterTerakhir").innerText = currentBillCounterValue.toLocaleString('id-ID');
+                        const derajatRotasi = (res.stability / 100) * 180;
+                        if (gaugeRing) gaugeRing.style.transform = `rotate(${derajatRotasi}deg)`;
+
+                        const derajatRotasiHarian = ((res.stabilityHarian || 0) / 100) * 180;
+                        if (gaugeRingHarian) gaugeRingHarian.style.transform = `rotate(${derajatRotasiHarian}deg)`;
+
+                        if(res.stability < 90) {
+                            labelStab.innerText = "Kalibrasi!";
+                            labelStab.className = "text-[11px] font-semibold text-amber-600 mt-2 bg-amber-50 px-2 py-0.5 rounded-full";
+                            if (gaugeRing) {
+                                gaugeRing.style.borderBottomColor = "#ea580c";
+                                gaugeRing.style.borderRightColor = "#ea580c";
+                            }
+                        } else {
+                            labelStab.innerText = "Optimal";
+                            labelStab.className = "text-[11px] font-semibold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full";
+                            if (gaugeRing) {
+                                gaugeRing.style.borderBottomColor = "#2563eb";
+                                gaugeRing.style.borderRightColor = "#2563eb";
+                            }
+                        }
+
+                        if((res.stabilityHarian || 0) < 90) {
+                            if (gaugeRingHarian) {
+                                gaugeRingHarian.style.borderBottomColor = "#ea580c";
+                                gaugeRingHarian.style.borderRightColor = "#ea580c";
+                            }
+                        } else {
+                            if (gaugeRingHarian) {
+                                gaugeRingHarian.style.borderBottomColor = "#2563eb";
+                                gaugeRingHarian.style.borderRightColor = "#2563eb";
+                            }
+                        }
+
+                        const nilaiPpm = parseFloat(res.ppm) || 0;
+                        document.getElementById("lblPpm").innerText = nilaiPpm;
+                        drawSpeedometerJarum(nilaiPpm);
+
+                        const tombolPanggil = document.getElementById("btnPanggilTeknisi");
+                        const adaTiketOpen = res.histori.some(row => row.status.toUpperCase() === "OPEN");
+                        
+                        if (tombolPanggil) {
+                            if (adaTiketOpen) {
+                                tombolPanggil.disabled = true;
+                                tombolPanggil.innerText = "⏳ Status: Menunggu Perbaikan...";
+                                tombolPanggil.className = "bg-slate-300 text-slate-500 font-bold px-6 py-3 rounded-xl cursor-not-allowed shadow-none flex items-center gap-3 text-sm";
+                            } else {
+                                tombolPanggil.disabled = false;
+                                tombolPanggil.innerText = "PANGGIL TEKNISI PRIORITY";
+                                tombolPanggil.className = "bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center gap-3 text-sm active:scale-95";
+                            }
+                        }
+
+                        let htmlTabel = "";
+                        res.histori.forEach(row => {
+                            htmlTabel += `
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="p-4 font-medium text-slate-600">${row.waktu}</td>
+                                    <td class="p-4 font-semibold text-slate-900"><i class="fa-solid fa-microchip text-xs text-blue-400 mr-1.5"></i>${row.operator}</td>
+                                    <td class="p-4"><span class="px-2.5 py-1 text-xs font-bold bg-blue-100 text-blue-700 rounded-full uppercase tracking-wide">${row.kategori}</span></td>
+                                    <td class="p-4 text-slate-500 font-mono">${row.keterangan}</td>
+                                    <td class="p-4"><span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200"><i class="fa-solid fa-circle-check mr-1"></i>${row.status}</span></td>
+                                </tr>
+                            `;
+                        });
+                        document.getElementById("tabelHistoriBody").innerHTML = htmlTabel;
+                    }
+                })
+                .ambilDataMaintenance(idMesinGlobal);
+        }
+
+        function drawSpeedometerJarum(speed) {
+            const canvas = document.getElementById('speedometerCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height - 5;
+            const radius = 75;
+            const maxSpeed = 150;
+            
+            const currentSpeed = Math.min(Math.max(speed, 0), maxSpeed);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            const speedRatio = currentSpeed / maxSpeed;
+            const speedAngle = Math.PI + (speedRatio * Math.PI);
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, Math.PI, speedAngle);
+            const gradient = ctx.createLinearGradient(0, centerY, canvas.width, centerY);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(1, '#6366f1');
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(speedRatio * Math.PI); 
+            ctx.beginPath();
+            ctx.moveTo(0, -4); 
+            ctx.lineTo(-(radius - 12), 0); 
+            ctx.lineTo(0, 4); 
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 7, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
+
+function kirimPanggilanUrgent() {
+    const waktu = document.getElementById("panggilWaktu").value;
+    const pelapor = document.getElementById("panggilPelapor").value.trim();
+    const keluhan = document.getElementById("panggilKeluhan").value.trim();
+  
+    if (!waktu || !pelapor || !keluhan) {
+        alert("⚠️ Mohon lengkapi semua data panggilan!");
+        return;
+    }
+
+    // Membawa parameter counter awal (kosongkan atau isi 0 karena nanti ESP yang menghitung)
+    const dataForm = {
+        noMesin: idMesinGlobal,
+        //NamaPelanggan:namaPelangganGlobal,
+        panggilWaktu: waktu,
+        pelapor: pelapor,
+        keluhan: keluhan,
+        billCounter: currentBillCounterValue,
+        pelangganServer: namaPelangganGlobal || "Urgent"
+    };
+
+    const btnPanggil = document.querySelector("button[onclick='kirimPanggilanUrgent()']");
+    if(btnPanggil) {
+        btnPanggil.disabled = true;
+        btnPanggil.innerText = "⏳ Memeriksa Koordinat...";
+    }
+
+    // 1. Cek status koordinat di kolom Q tabel Reff
+    google.script.run
+        .withSuccessHandler(function(cekRes) {
+            if (cekRes.status === "KOSONG") {
+                const konfirmasi = confirm("Apakah Anda dekat dengan mesin? Jika ya, klik OK untuk mendaftarkan lokasi pusat mesin.");
+                
+                if (konfirmasi) {
+                    if (btnPanggil) btnPanggil.innerText = "⏳ Mengunci GPS...";
+                    
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            function(pos) {
+                                const koordinatSekarang = pos.coords.latitude + ", " + pos.coords.longitude;
+                                if (btnPanggil) btnPanggil.innerText = "⏳ Menyimpan Lokasi Mesin...";
+                                
+                                // Simpan ke kolom Q, jika sukses langsung panggil fungsi buat tiket
+                                google.script.run
+                                    .withSuccessHandler(function() {
+                                        if (btnPanggil) btnPanggil.innerText = "⏳ Membuat Tiket Panggilan...";
+                                        eksekusiKirimTiketPanggilan(dataForm, btnPanggil);
+                                    })
+                                    .withFailureHandler(function(err) {
+                                        alert("❌ Gagal simpan koordinat ke tabel reff: " + err);
+                                        aktifkanTombolPanggil(btnPanggil);
+                                    })
+                                    .cekAtauSimpanKoordinatMesin(idMesinGlobal, koordinatSekarang);
+                            }, 
+                            function(err) {
+                                alert("❌ Gagal mengambil GPS! Panggilan dibatalkan. Pastikan izin GPS aktif.");
+                                aktifkanTombolPanggil(btnPanggil);
+                            }, 
+                            { enableHighAccuracy: true, timeout: 10000 }
+                        );
+                    } else {
+                        alert("❌ Browser tidak mendukung GPS.");
+                        aktifkanTombolPanggil(btnPanggil);
+                    }
+                } else {
+                    alert("Panggilan dibatalkan oleh operator.");
+                    aktifkanTombolPanggil(btnPanggil);
+                }
+            } else {
+                // JIKA KOLOM Q SUDAH TERISI -> LANGSUNG PROSES
+                if (btnPanggil) btnPanggil.innerText = "⏳ Membuat Tiket Panggilan...";
+                eksekusiKirimTiketPanggilan(dataForm, btnPanggil);
+            }
+        })
+        .withFailureHandler(function(err) {
+            alert("❌ Gagal terhubung ke server: " + err);
+            aktifkanTombolPanggil(btnPanggil);
+        })
+        .cekAtauSimpanKoordinatMesin(idMesinGlobal, null);
+}
+
+// Menghubungkan langsung ke fungsi ASLI di Code.gs Anda: buatPanggilanTeknisi
+function eksekusiKirimTiketPanggilan(dataForm, btnPanggil) {
+    google.script.run
+        .withSuccessHandler(function(response) {
+            alert(response.message);
+            if (response.success) {
+                // 1. Kosongkan Form Input di Dalam Modal
+                document.getElementById("panggilPelapor").value = "";
+                document.getElementById("panggilKeluhan").value = "";
+                
+                // 2. Tutup Modal Popup Panggilan
+                tutupModalPanggil();
+                
+                // 3. Refresh Tampilan Data Utama
+                refreshDataMaintenance();
+
+                // 4. SUSUN TEKS WHATSAPP (Menggunakan parameter dataForm yang benar)
+                var teksPesan = "🚨 *PANGGILAN URGENT =SLA=* 🚨\n\n" +
+                                "• *Pelanggan:* " + (namaPelangganGlobal || "Client Umum") + "\n" +
+                                "• *No. Mesin:* " + dataForm.noMesin + "\n" +
+                                "• *Pelapor:* " + dataForm.pelapor + "\n" +
+                                "• *Keluhan:* " + dataForm.keluhan + "\n" +
+                                "• *Counter Panggil:* " + dataForm.billCounter + "\n" +
+                                "• *Status:* DOWN\n\n" +
+                                "Mohon segera ditindaklanjuti. Terima kasih.";
+
+                var urlWA = "https://api.whatsapp.com/send?phone=" + nomorHpKantorDinamis + "&text=" + encodeURIComponent(teksPesan);
+                
+                // 5. Alihkan atau Buka Tautan WhatsApp
+                setTimeout(function() {
+                    window.open(urlWA, '_blank'); // Menggunakan '_blank' agar tab maintenance tidak tertutup
+                }, 1000);
+            }
+            resetTombolPanggil(btnPanggil);
+        })
+        .withFailureHandler(function(err) {
+            alert("❌ Gagal membuat tiket maintenance: " + err);
+            resetTombolPanggil(btnPanggil);
+        })
+        .buatPanggilanTeknisi(dataForm); 
+}
+
+function aktifkanTombolPanggil(btnPanggil) {
+    if (btnPanggil) {
+        btnPanggil.disabled = false;
+        btnPanggil.innerText = "Kirim Panggilan Darurat";
+    }
+}
+
+
+
+        function resetTombolPanggil(btn) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "Kirim Panggilan Ke Tabel";
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
+        }
+function klikCatatKedatangan() {
+    var nama = document.getElementById("inputTeknisi").value.trim();
+
+
+    var btn = document.getElementById("btnKedatangan");
+    btn.disabled = true; 
+    btn.innerText = "Mencatat Jam Tiba...";
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            alert(res.message);
+            btn.disabled = false;
+            btn.innerText = "Penanganan Teknisi";
+            refreshDataMaintenance(); // Muat ulang tabel histori bawah
+        })
+        .withFailureHandler(function(err) {
+            alert("Gagal koneksi ke server: " + err);
+            btn.disabled = false;
+            btn.innerText = "Penanganan Teknisi";
+        })
+        .catatKedatanganTeknisi({ noMesin: idMesinGlobal, namaTeknisi: nama });
+}
+
+function simpanLogTeknisi() {
+    const namaTeknisi = document.getElementById("inputTeknisi").value.trim();
+    const jenisTindakan = document.getElementById("inputJenis").value;
+    const keterangan = document.getElementById("inputKeterangan").value.trim();
+    const nilaiCounterSaatIni = currentBillCounterValue; // cari nilai billing dimana?
+    if (!namaTeknisi || !keterangan) {
+        alert("⚠️ Nama Teknisi dan Keterangan Tindakan wajib diisi!");
+        return;
+    }
+
+    // Ambil elemen tombol agar bisa di-disable saat loading geolocation
+    const btnSimpan = document.querySelector("button[onclick='simpanLogTeknisi()']");
+    btnSimpan.disabled = true;
+    btnSimpan.innerText = "⏳ Verifikasi...";
+
+    // PROSES CEK GEOLOCATION TEKNISI
+    if (!navigator.geolocation) {
+        alert("❌ Browser Anda tidak mendukung fitur lokasi GPS. Gagal validasi.");
+        btnSimpan.disabled = false;
+        btnSimpan.innerText = "Simpan Log Pemeliharaan";
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const latTeknisi = position.coords.latitude;
+            const lonTeknisi = position.coords.longitude;
+
+            // Jalankan validasi 200 meter di server Apps Script
+            google.script.run
+                .withSuccessHandler(function(validasi) {
+                    if (validasi.lolos) {
+                        // JIKA LOLOS VALIDASI (< 200m), LANJUTKAN PROSES SIMPAN ASLI ANDA
+                        const dataForm = {
+                            noMesin: idMesinGlobal,
+                            namaTeknisi: namaTeknisi,
+                            jenisTindakan: jenisTindakan,
+                            keterangan: keterangan + " (Terverifikasi: " + (validasi.jarak || 0) + "m)",
+                            billCounter: currentBillCounterValue,
+                            pelangganServer: namaPelangganGlobal || "Monitor"
+                        };
+
+                        google.script.run
+                            .withSuccessHandler(function(response) {
+                                alert(response.message);
+                                if (response.success) {
+                                    document.getElementById("inputTeknisi").value = namaTeknisi;
+                                    document.getElementById("inputKeterangan").value = "";
+                                    refreshDataMaintenance();
+                                }
+                                btnSimpan.disabled = false;
+                                btnSimpan.innerText = "Simpan Log Pemeliharaan";
+                            })
+                            .selesaikanTindakanTeknisi(dataForm);
+
+                    } else {
+                        // JIKA TERDETEKSI DI LUAR RADIUS 200 METER
+                        alert("❌ PENGISIAN DITOLAK!\nAnda terdeteksi berada di luar area mesin.\nJarak Anda saat ini: " + validasi.jarak + " meter dari mesin (Maksimal toleransi 200 meter).");
+                        btnSimpan.disabled = false;
+                        btnSimpan.innerText = "Simpan Log Pemeliharaan";
+                    }
+                })
+                .validasiJarakTeknisi(idMesinGlobal, latTeknisi, lonTeknisi);
+        },
+        function(error) {
+            alert("❌ Gagal mendapatkan GPS! Pastikan izin lokasi HP aktif dan gunakan koneksi internet yang stabil.");
+            btnSimpan.disabled = false;
+            btnSimpan.innerText = "Simpan Log Pemeliharaan";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+       
+
+        let pembaruanOtomatisTimer;
+        function mulaiAutoRefresh() {
+            refreshDataMaintenance();
+            pembaruanOtomatisTimer = setInterval(function() {
+                console.log("Menyinkronkan data pemeliharaan dengan Google Sheets...");
+                refreshDataMaintenance();
+            }, 30000);
+        }
+
+        function hentikanAutoRefresh() {
+            if (pembaruanOtomatisTimer) {
+                clearInterval(pembaruanOtomatisTimer);
+                console.log("Auto-refresh dihentikan.");
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            mulaiAutoRefresh();
+        });
+        function bukaModalPanggil() { document.getElementById('modalPanggil').classList.remove('hidden'); }
+        function tutupModalPanggil() { document.getElementById('modalPanggil').classList.add('hidden'); }
+
+        // =========================================================================
+// FITUR LOCK & REDIRECT TOMBOL BACK HP KE DASHBOARD
+// =========================================================================
+function kembaliKeDashboard() {
+    // Hentikan interval auto-refresh halaman agar tidak memicu memory leak / boros kuota
+    if (typeof hentikanAutoRefresh === "function") {
+        hentikanAutoRefresh();
+    }
+
+    // Bangun URL arah Dashboard dengan parameter ID Mesin Server yang aman
+    var urlDashboard = "<?= ScriptApp.getService().getUrl() ?>?page=dashboard&noMesin=" + encodeURIComponent(idMesinGlobal);
+
+    // Alihkan halaman secara paksa
+    window.location.href = urlDashboard;
+}
+(function() {
+    // 1. Masukkan status tiruan ke riwayat browser saat halaman dimuat
+    window.history.pushState({ page: 'maintenance' }, '', window.location.href);
+
+    // 2. Tangkap event ketika user menekan tombol kembali (Back) di HP
+    window.onpopstate = function(event) {
+        // Hentikan interval auto-refresh halaman agar tidak memicu memory leak
+        if (typeof hentikanAutoRefresh === "function") {
+            hentikanAutoRefresh();
+        }
+
+        // 3. Bangun URL arah Dashboard dengan parameter ID Mesin Server yang aman
+        var urlDashboard = "<?= ScriptApp.getService().getUrl() ?>?page=dashboard&noMesin=" + encodeURIComponent(idMesinGlobal);
+
+        // 4. Alihkan halaman secara paksa
+        window.location.href = urlDashboard;
+    };
+})();
+    </script>
+</body>
+</html>
